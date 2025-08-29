@@ -1,0 +1,70 @@
+/* Page */
+.page {
+  max-width: 1000px;
+  margin: 24px auto 48px auto;
+  padding: 0 16px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+  color: #1f2937; /* slate-800 */
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+/* Titles */
+.title {
+  text-align: center;
+  color: #0d6efd; /* bootstrap blue */
+  margin: 8px 0 4px 0;
+}
+.subtitle {
+  text-align: center;
+  color: #6b7280; /* slate-500 */
+  margin: 0 0 20px 0;
+}
+
+/* Controls */
+.controls {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(2, 6, 23, 0.08);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.radio-group {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.radio-label {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f1f5f9; /* slate-100 */
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.radio-label:hover {
+  background: #f0e6e2; /* slate-200 */
+}
+.radio-input {
+  margin-right: 6px;
+}
+
+/* Card */
+.card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 8px 28px rgba(2, 6, 23, 0.10);
+  padding: 8px 10px;
+  margin: 10px 0 22px 0;
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  color: #9ca3af; /* slate-400 */
+  padding-top: 6px;
+  font-size: 14px;
+}
