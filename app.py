@@ -3,23 +3,33 @@ import pandas as pd
 import dash
 from dash import dcc, html, Input, Output
 import plotly.express as px
-import plotly.graph_objects as go
 
 # -----------------------------
-# Load data (prefer ./output/output.csv)
+# Load data (prefer ./output/output.csv, fallback to ./data/processed_sales.csv)
 # -----------------------------
 DATA_PRIMARY = "./output/output.csv"
 DATA_FALLBACK = "./data/processed_sales.csv"
 data_path = DATA_PRIMARY if os.path.exists(DATA_PRIMARY) else DATA_FALLBACK
 
 df = pd.read_csv(data_path)
+
+# Ensure required columns exist and are typed correctly
+if "date" not in df.columns or "sales" not in df.columns:
+    raise ValueError(
+        f"Expected columns ['sales','date','region'] in {data_path}. "
+        "Re-run process_data.py to generate the proper output."
+    )
+
 df["date"] = pd.to_datetime(df["date"], errors="coerce")
 df["sales"] = pd.to_numeric(df["sales"], errors="coerce")
-df = df.dropna(subset=["date", "sales"]).sort_values("date")
 
-# Some inputs might miss region; create a single bucket
+# Some inputs might miss region; create a single bucket and normalize to lowercase
 if "region" not in df.columns:
     df["region"] = "all"
+df["region"] = df["region"].str.lower().fillna("all")
+
+# Drop bad rows and sort
+df = df.dropna(subset=["date", "sales"]).sort_values("date")
 
 PRICE_INCREASE_DATE = pd.Timestamp("2021-01-15")
 
@@ -28,6 +38,14 @@ PRICE_INCREASE_DATE = pd.Timestamp("2021-01-15")
 # -----------------------------
 app = dash.Dash(__name__)
 server = app.server
+
+REGION_OPTIONS = [
+    {"label": "North", "value": "north"},
+    {"label": "East",  "value": "east"},
+    {"label": "South", "value": "south"},
+    {"label": "West",  "value": "west"},
+    {"label": "All",   "value": "all"},
+]
 
 app.layout = html.Div(
     className="page",
@@ -44,13 +62,7 @@ app.layout = html.Div(
                 html.Label("Region", className="label"),
                 dcc.RadioItems(
                     id="region-radio",
-                    options=[
-                        {"label": "North", "value": "north"},
-                        {"label": "East",  "value": "east"},
-                        {"label": "South", "value": "south"},
-                        {"label": "West",  "value": "west"},
-                        {"label": "All",   "value": "all"},
-                    ],
+                    options=REGION_OPTIONS,
                     value="all",
                     className="radio-group",
                     inputClassName="radio-input",
@@ -59,45 +71,80 @@ app.layout = html.Div(
             ],
         ),
 
+        html.Div(className="card", children=[dcc.Graph(id="sales-graph", config={"displayModeBar": False})]),
+
+        # KPIs
         html.Div(
-            className="card",
+            className="kpi-row",
             children=[
-                dcc.Graph(id="sales-graph", config={"displayModeBar": False})
-            ],
+                html.Div(className="kpi", children=[
+                    html.Div("Total Sales BEFORE 15 Jan 2021", className="kpi-label"),
+                    html.Div(id="kpi-before", className="kpi-value"),
+                ]),
+                html.Div(className="kpi", children=[
+                    html.Div("Total Sales AFTER 15 Jan 2021", className="kpi-label"),
+                    html.Div(id="kpi-after", className="kpi-value"),
+                ]),
+                html.Div(className="kpi", children=[
+                    html.Div("Δ (After - Before)", className="kpi-label"),
+                    html.Div(id="kpi-delta", className="kpi-value"),
+                ]),
+                html.Div(className="kpi", children=[
+                    html.Div("% Change", className="kpi-label"),
+                    html.Div(id="kpi-pct", className="kpi-value"),
+                ]),
+            ]
         ),
+
+        html.Div(id="kpi-verdict", className="verdict"),
 
         html.Footer("Built with Dash • Quantium mini-project", className="footer"),
     ],
 )
 
 # -----------------------------
+# Helpers
+# -----------------------------
+def filter_and_aggregate(region_choice: str) -> pd.DataFrame:
+    if region_choice == "all":
+        use_df = df
+    else:
+        use_df = df[df["region"] == region_choice]
+    daily = use_df.groupby("date", as_index=False)["sales"].sum().sort_values("date")
+    return daily
+
+def compute_kpis(daily: pd.DataFrame):
+    before_total = daily.loc[daily["date"] < PRICE_INCREASE_DATE, "sales"].sum()
+    after_total  = daily.loc[daily["date"] >= PRICE_INCREASE_DATE, "sales"].sum()
+    delta = after_total - before_total
+    pct = (delta / before_total * 100) if before_total != 0 else float("inf")
+    verdict = (
+        "Sales were HIGHER AFTER the price increase"
+        if after_total > before_total
+        else "Sales were HIGHER BEFORE the price increase"
+        if after_total < before_total
+        else "No change in sales across the split"
+    )
+    return before_total, after_total, delta, pct, verdict
+
+# -----------------------------
 # Callback
 # -----------------------------
 @app.callback(
     Output("sales-graph", "figure"),
-    Input("region-radio", "value")
+    Output("kpi-before", "children"),
+    Output("kpi-after", "children"),
+    Output("kpi-delta", "children"),
+    Output("kpi-pct", "children"),
+    Output("kpi-verdict", "children"),
+    Input("region-radio", "value"),
 )
-def update_graph(region_choice: str):
-    # Filter and aggregate
-    if region_choice == "all":
-        use_df = df.copy()
-    else:
-        use_df = df[df["region"].str.lower() == region_choice]
+def update_view(region_choice: str):
+    daily = filter_and_aggregate(region_choice)
 
-    daily = (
-        use_df.groupby("date", as_index=False)["sales"]
-        .sum()
-        .sort_values("date")
-    )
-
-    # Build base line
-    fig = px.line(
-        daily,
-        x="date", y="sales",
-        title="Pink Morsel Sales Over Time",
-    )
-
-    # Vertical marker for the price increase (use shapes for robustness)
+    # Build the line chart
+    fig = px.line(daily, x="date", y="sales", title="Pink Morsel Sales Over Time")
+    # Vertical marker for price increase (using shapes so no annotation math issues)
     fig.add_shape(
         type="line",
         x0=PRICE_INCREASE_DATE, x1=PRICE_INCREASE_DATE,
@@ -106,22 +153,32 @@ def update_graph(region_choice: str):
         line=dict(color="black", width=2, dash="dash"),
     )
     fig.add_annotation(
-        x=PRICE_INCREASE_DATE, y=1,
-        xref="x", yref="paper",
-        text="Price Increase",
-        showarrow=False,
-        yshift=10
+        x=PRICE_INCREASE_DATE, y=1, xref="x", yref="paper",
+        text="Price Increase", showarrow=False, yshift=10
     )
-
     fig.update_layout(
         xaxis_title="Date",
         yaxis_title="Sales",
         title_x=0.5,
         margin=dict(l=40, r=20, t=60, b=40),
         hovermode="x unified",
+        xaxis=dict(showgrid=True),
+        yaxis=dict(showgrid=True),
     )
 
-    return fig
+    # KPIs
+    before_total, after_total, delta, pct, verdict = compute_kpis(daily)
+    money = lambda x: f"${x:,.0f}"
+    pct_str = "∞" if pct == float("inf") else f"{pct:.1f}%"
+
+    return (
+        fig,
+        money(before_total),
+        money(after_total),
+        money(delta),
+        pct_str,
+        f"Conclusion: {verdict}",
+    )
 
 # -----------------------------
 # Run
