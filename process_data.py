@@ -1,31 +1,42 @@
 import pandas as pd
-import glob
+import os
 
-# Step 1: Get all CSV files from data folder
-files = glob.glob("data/*.csv")
+DATA_DIRECTORY = "./data"
+OUTPUT_FILE_PATH = "./output/output.csv"
 
-dfs = []
+os.makedirs("./output", exist_ok=True)
 
-for file in files:
-    # Step 2: Read each file
-    df = pd.read_csv(file)
-    
-    # Step 3: Filter only Pink Morsel (case-insensitive)
-    df = df[df["product"].str.lower() == "pink morsel"]
-    
-    # Step 4: Compute Sales (as numeric, rounded to 2 decimals)
-    df["sales"] = (df["quantity"] * df["price"]).round(2)
-    
-    # Step 5: Keep only required columns
-    df = df[["sales", "date", "region"]]
-    
-    dfs.append(df)
+all_rows = []
 
-# Step 6: Combine all data
-final_df = pd.concat(dfs)
+# Loop through CSVs
+for file_name in os.listdir(DATA_DIRECTORY):
+    if file_name.endswith(".csv"):
+        df = pd.read_csv(f"{DATA_DIRECTORY}/{file_name}")
 
-# Step 7: Save to CSV
-final_df.to_csv("data/processed_sales.csv", index=False)
+        # Normalize column names to lowercase
+        df.columns = [c.lower() for c in df.columns]
 
-print("✅ Processed file saved to data/processed_sales.csv")
+        # Ensure required columns exist
+        if not {"product", "price", "quantity", "date", "region"}.issubset(df.columns):
+            print(f"Skipping {file_name}, missing columns: {df.columns}")
+            continue
 
+        # Filter for Pink Morsel
+        df = df[df["product"].str.lower() == "pink morsel"]
+
+        # Clean price column
+        df["price"] = df["price"].replace("[\$,]", "", regex=True).astype(float)
+
+        # Compute sales
+        df["sales"] = df["price"] * df["quantity"]
+
+        all_rows.append(df[["sales", "date", "region"]])
+
+# Concatenate everything
+if all_rows:
+    final_df = pd.concat(all_rows)
+    final_df = final_df.sort_values(by=["date", "region"])
+    final_df.to_csv(OUTPUT_FILE_PATH, index=False)
+    print(f"✅ Cleaned & sorted output saved to {OUTPUT_FILE_PATH}")
+else:
+    print("⚠️ No valid data processed. Check your input files.")

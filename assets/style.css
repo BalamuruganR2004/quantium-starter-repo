@@ -9,7 +9,7 @@
 }
 
 /* Titles */
-.title {
+#header {
   text-align: center;
   color: #0d6efd; /* bootstrap blue */
   margin: 8px 0 4px 0;
@@ -33,31 +33,24 @@
   font-weight: 600;
   margin-bottom: 8px;
 }
-.radio-group {
-  display: flex;
-  gap: 18px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-.radio-label {
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: #f1f5f9; /* slate-100 */
-  cursor: pointer;
-  transition: background 0.15s ease, transform 0.05s ease;
-}
-.radio-label:hover {
-  background: #e2e8f0; /* slate-200 */
-}
-.radio-input {
-  margin-right: 6px;
-}
 
-/* Make the selected option feel active */
-input.radio-input:checked + .radio-label,
-.radio-group input[type="radio"]:checked + span {
-  background: #dbeafe; /* blue-100 */
-  font-weight: 600;
+/* Style the region dropdown */
+#region-picker {
+  width: 220px;
+  font-size: 14px;
+}
+.Select-control {
+  border-radius: 8px !important;
+  border: 1px solid #d1d5db !important; /* slate-300 */
+  box-shadow: none !important;
+}
+.Select-control:hover {
+  border-color: #9ca3af !important; /* slate-400 */
+}
+.Select-menu-outer {
+  border-radius: 8px !important;
+  border: 1px solid #d1d5db !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08) !important;
 }
 
 /* Card */

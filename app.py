@@ -13,7 +13,6 @@ data_path = DATA_PRIMARY if os.path.exists(DATA_PRIMARY) else DATA_FALLBACK
 
 df = pd.read_csv(data_path)
 
-# Ensure required columns exist and are typed correctly
 if "date" not in df.columns or "sales" not in df.columns:
     raise ValueError(
         f"Expected columns ['sales','date','region'] in {data_path}. "
@@ -23,12 +22,10 @@ if "date" not in df.columns or "sales" not in df.columns:
 df["date"] = pd.to_datetime(df["date"], errors="coerce")
 df["sales"] = pd.to_numeric(df["sales"], errors="coerce")
 
-# Some inputs might miss region; create a single bucket and normalize to lowercase
 if "region" not in df.columns:
     df["region"] = "all"
 df["region"] = df["region"].str.lower().fillna("all")
 
-# Drop bad rows and sort
 df = df.dropna(subset=["date", "sales"]).sort_values("date")
 
 PRICE_INCREASE_DATE = pd.Timestamp("2021-01-15")
@@ -50,7 +47,7 @@ REGION_OPTIONS = [
 app.layout = html.Div(
     className="page",
     children=[
-        html.H1("Pink Morsel Visualizer", className="title"),
+        html.H1("Pink Morsel Visualizer", id="header", className="title"),
         html.P(
             "Sales trends before and after the price increase on 15 Jan 2021.",
             className="subtitle"
@@ -61,7 +58,7 @@ app.layout = html.Div(
             children=[
                 html.Label("Region", className="label"),
                 dcc.RadioItems(
-                    id="region-radio",
+                    id="region-picker",   # ✅ matches tests
                     options=REGION_OPTIONS,
                     value="all",
                     className="radio-group",
@@ -73,7 +70,6 @@ app.layout = html.Div(
 
         html.Div(className="card", children=[dcc.Graph(id="sales-graph", config={"displayModeBar": False})]),
 
-        # KPIs
         html.Div(
             className="kpi-row",
             children=[
@@ -137,14 +133,12 @@ def compute_kpis(daily: pd.DataFrame):
     Output("kpi-delta", "children"),
     Output("kpi-pct", "children"),
     Output("kpi-verdict", "children"),
-    Input("region-radio", "value"),
+    Input("region-picker", "value"),
 )
 def update_view(region_choice: str):
     daily = filter_and_aggregate(region_choice)
 
-    # Build the line chart
     fig = px.line(daily, x="date", y="sales", title="Pink Morsel Sales Over Time")
-    # Vertical marker for price increase (using shapes so no annotation math issues)
     fig.add_shape(
         type="line",
         x0=PRICE_INCREASE_DATE, x1=PRICE_INCREASE_DATE,
@@ -166,7 +160,6 @@ def update_view(region_choice: str):
         yaxis=dict(showgrid=True),
     )
 
-    # KPIs
     before_total, after_total, delta, pct, verdict = compute_kpis(daily)
     money = lambda x: f"${x:,.0f}"
     pct_str = "∞" if pct == float("inf") else f"{pct:.1f}%"
@@ -180,8 +173,5 @@ def update_view(region_choice: str):
         f"Conclusion: {verdict}",
     )
 
-# -----------------------------
-# Run
-# -----------------------------
 if __name__ == "__main__":
     app.run(debug=True)
